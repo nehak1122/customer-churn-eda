@@ -1,10 +1,13 @@
-"""Customer Churn Gap-Analysis Dashboard.
+"""Customer Churn — Overall Analytics Dashboard.
 
-Streamlit app implementing the three gaps identified in the review of
-20 churn research papers (2015-2026):
-  1. Class imbalance handling (SMOTE) - measured, not assumed
-  2. Explainability (SHAP) - global and per-customer
-  3. What-if intervention simulation - does fixing the problem work?
+Full churn dashboard for the Telco dataset:
+  - Executive overview (KPIs, churn split, predicted-risk distribution)
+  - EDA insights (contract, payment, services, tenure, charges, demographics)
+  - Risk segmentation (predicted-risk tiers, revenue at risk, top at-risk list)
+  - Gap-analysis from the 20-paper literature review (2015-2026):
+      Gap 1: class imbalance handling (SMOTE) - measured, not assumed
+      Gap 2: explainability (SHAP) - global and per-customer
+      Gap 3: what-if intervention simulation - does fixing the problem work?
 
 Run from the repo root:  streamlit run dashboard/app.py
 """
@@ -36,7 +39,7 @@ from ml.shap_explainer import (  # noqa: E402
 
 ARTIFACTS = ROOT / "ml" / "artifacts"
 
-st.set_page_config(page_title="Churn Gap-Analysis Dashboard", page_icon="📉", layout="wide")
+st.set_page_config(page_title="Customer Churn Dashboard", page_icon="📉", layout="wide")
 
 
 @st.cache_resource
@@ -58,6 +61,11 @@ except FileNotFoundError:
 
 
 @st.cache_data
+def cached_risk() -> pd.Series:
+    return churn_probability(model, df_raw, meta["feature_columns"])
+
+
+@st.cache_data
 def cached_global_importance(top_n: int = 15) -> pd.DataFrame:
     sample = X_all.sample(min(800, len(X_all)), random_state=42)
     return global_importance(explainer, sample, top_n=top_n)
@@ -67,17 +75,56 @@ def cached_global_importance(top_n: int = 15) -> pd.DataFrame:
 def cached_cohort_sim(threshold: float) -> pd.DataFrame:
     return simulate_cohort(model, df_raw, meta["feature_columns"], risk_threshold=threshold)
 
-risk_all = churn_probability(model, df_raw, meta["feature_columns"])
 
-st.title("📉 Customer Churn — Gap-Analysis Dashboard")
+risk_all = cached_risk()
+churned_mask = df_raw["Churn"] == "Yes"
+
+
+def churn_rate_by(col: str) -> pd.DataFrame:
+    """Churn % and customer count per category of a raw column."""
+    grouped = (
+        df_raw.assign(churned=churned_mask.astype(int))
+        .groupby(col)
+        .agg(churn_rate=("churned", "mean"), customers=("churned", "size"))
+        .reset_index()
+    )
+    grouped["churn_rate"] *= 100
+    return grouped
+
+
+def rate_bar(data: pd.DataFrame, x: str, title: str, color: str = "#1f77b4"):
+    fig = px.bar(
+        data,
+        x=x,
+        y="churn_rate",
+        title=title,
+        labels={"churn_rate": "Churn rate (%)"},
+        text=data["churn_rate"].round(1),
+    )
+    fig.update_traces(marker_color=color, textposition="outside")
+    fig.update_layout(yaxis_range=[0, max(55, data["churn_rate"].max() * 1.2)])
+    return fig
+
+
+st.title("📉 Customer Churn — Analytics Dashboard")
 st.caption(
-    "Implements the three gaps found across 20 research papers (2015–2026): "
-    "class imbalance handling, SHAP explainability, and what-if intervention testing."
+    "Telco Customer Churn: executive overview, EDA insights, risk segmentation, and the "
+    "gap-analysis from 20 research papers (2015–2026) — imbalance handling, SHAP "
+    "explainability, and what-if intervention testing."
 )
 
-tab_overview, tab_gap1, tab_gap2, tab_gap3 = st.tabs(
+(
+    tab_overview,
+    tab_eda,
+    tab_risk,
+    tab_gap1,
+    tab_gap2,
+    tab_gap3,
+) = st.tabs(
     [
-        "📊 Overview",
+        "📊 Executive Overview",
+        "🔎 EDA Insights",
+        "🎯 Risk Segmentation",
         "⚖️ Gap 1 · Imbalance (SMOTE)",
         "🔍 Gap 2 · Explainability (SHAP)",
         "🧪 Gap 3 · What-If Simulator",
@@ -86,46 +133,246 @@ tab_overview, tab_gap1, tab_gap2, tab_gap3 = st.tabs(
 
 # ---------------------------------------------------------------- Overview
 with tab_overview:
-    churn_rate = (df_raw["Churn"] == "Yes").mean() * 100
-    c1, c2, c3, c4 = st.columns(4)
+    churn_rate = churned_mask.mean() * 100
+    monthly_rev = df_raw["MonthlyCharges"].sum()
+    lost_rev = df_raw.loc[churned_mask, "MonthlyCharges"].sum()
+
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Customers", f"{len(df_raw):,}")
     c2.metric("Churn rate", f"{churn_rate:.1f}%")
-    c3.metric("Best model", meta["best_model"])
-    c4.metric("At-risk customers (p ≥ 0.5)", f"{int((risk_all >= 0.5).sum()):,}")
+    c3.metric("Monthly revenue", f"${monthly_rev:,.0f}")
+    c4.metric("Revenue lost to churn", f"${lost_rev:,.0f}/mo")
+    c5.metric("At-risk customers (p ≥ 0.5)", f"{int((risk_all >= 0.5).sum()):,}")
 
-    left, right = st.columns(2)
+    left, mid, right = st.columns([1, 1.2, 1.2])
     with left:
+        fig = px.pie(
+            names=["Stayed", "Churned"],
+            values=[int((~churned_mask).sum()), int(churned_mask.sum())],
+            hole=0.55,
+            title="Churn split",
+            color_discrete_sequence=["#2ca02c", "#d62728"],
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    with mid:
         fig = px.histogram(
             df_raw.assign(risk=risk_all),
             x="risk",
             nbins=40,
-            title="Predicted churn-risk distribution (all customers)",
+            title="Predicted churn-risk distribution",
             labels={"risk": "Predicted churn probability"},
         )
         fig.add_vline(x=0.5, line_dash="dash", line_color="red")
         st.plotly_chart(fig, use_container_width=True)
     with right:
-        by_contract = (
-            df_raw.assign(churned=(df_raw["Churn"] == "Yes").astype(int))
-            .groupby("Contract")["churned"]
+        avg = (
+            df_raw.assign(churned=churned_mask)
+            .groupby("churned")[["tenure", "MonthlyCharges"]]
+            .mean()
+            .rename(index={False: "Stayed", True: "Churned"})
+            .reset_index()
+        )
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="Avg tenure (months)", x=avg["churned"], y=avg["tenure"]))
+        fig.add_trace(
+            go.Bar(name="Avg monthly charges ($)", x=avg["churned"], y=avg["MonthlyCharges"])
+        )
+        fig.update_layout(barmode="group", title="Stayed vs churned — profile")
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown(
+        f"**Model in production:** {meta['best_model']} "
+        f"(F1 {meta['results'][meta['best_model']]['f1']:.2f}, "
+        f"ROC-AUC {meta['results'][meta['best_model']]['roc_auc']:.2f} on held-out test data). "
+        "See the Gap tabs for how it was selected, explained, and turned into actions."
+    )
+
+# ---------------------------------------------------------------- EDA
+with tab_eda:
+    st.subheader("What drives churn in the data")
+
+    r1c1, r1c2 = st.columns(2)
+    with r1c1:
+        st.plotly_chart(
+            rate_bar(churn_rate_by("Contract"), "Contract", "Churn rate by contract type"),
+            use_container_width=True,
+        )
+    with r1c2:
+        st.plotly_chart(
+            rate_bar(
+                churn_rate_by("PaymentMethod"), "PaymentMethod", "Churn rate by payment method"
+            ),
+            use_container_width=True,
+        )
+
+    r2c1, r2c2 = st.columns(2)
+    with r2c1:
+        st.plotly_chart(
+            rate_bar(
+                churn_rate_by("InternetService"),
+                "InternetService",
+                "Churn rate by internet service",
+            ),
+            use_container_width=True,
+        )
+    with r2c2:
+        bins = [0, 6, 12, 24, 48, 72]
+        labels = ["0–6", "7–12", "13–24", "25–48", "49–72"]
+        tenure_grp = (
+            df_raw.assign(
+                churned=churned_mask.astype(int),
+                tenure_group=pd.cut(df_raw["tenure"], bins=bins, labels=labels, right=True),
+            )
+            .groupby("tenure_group", observed=True)["churned"]
             .mean()
             .mul(100)
             .reset_index()
+            .rename(columns={"churned": "churn_rate"})
         )
+        st.plotly_chart(
+            rate_bar(tenure_grp, "tenure_group", "Churn rate by tenure (months)", "#ff7f0e"),
+            use_container_width=True,
+        )
+
+    r3c1, r3c2 = st.columns(2)
+    with r3c1:
+        services = ["OnlineSecurity", "TechSupport", "OnlineBackup", "DeviceProtection"]
+        rows = []
+        for svc in services:
+            sub = df_raw[df_raw[svc].isin(["Yes", "No"])]
+            for has in ["Yes", "No"]:
+                mask = sub[svc] == has
+                rows.append(
+                    {
+                        "service": svc,
+                        "has_service": "With" if has == "Yes" else "Without",
+                        "churn_rate": (sub.loc[mask, "Churn"] == "Yes").mean() * 100,
+                    }
+                )
         fig = px.bar(
-            by_contract,
-            x="Contract",
-            y="churned",
-            title="Actual churn rate by contract type",
-            labels={"churned": "Churn rate (%)"},
+            pd.DataFrame(rows),
+            x="service",
+            y="churn_rate",
+            color="has_service",
+            barmode="group",
+            title="Add-on services protect against churn",
+            labels={"churn_rate": "Churn rate (%)", "has_service": ""},
+            color_discrete_map={"With": "#2ca02c", "Without": "#d62728"},
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    with r3c2:
+        fig = px.histogram(
+            df_raw.assign(Churn=df_raw["Churn"]),
+            x="MonthlyCharges",
+            color="Churn",
+            nbins=40,
+            barmode="overlay",
+            opacity=0.6,
+            title="Monthly charges distribution by churn",
+            color_discrete_map={"No": "#2ca02c", "Yes": "#d62728"},
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    st.info(
-        "This dashboard extends the original EDA (see `Customer_Churn_EDA.ipynb`). "
-        "Each of the next three tabs closes one gap identified in the literature review — "
-        "see `GAP_ANALYSIS.md` for the paper-by-paper reasoning."
+    st.markdown("#### Demographics")
+    demo_rows = []
+    for col, yes_label, no_label in [
+        ("SeniorCitizen", "Senior citizen", "Not senior"),
+        ("Partner", "Has partner", "No partner"),
+        ("Dependents", "Has dependents", "No dependents"),
+    ]:
+        yes_mask = df_raw[col].isin([1, "Yes"])
+        demo_rows.append(
+            {"group": yes_label, "churn_rate": (df_raw.loc[yes_mask, "Churn"] == "Yes").mean() * 100}
+        )
+        demo_rows.append(
+            {"group": no_label, "churn_rate": (df_raw.loc[~yes_mask, "Churn"] == "Yes").mean() * 100}
+        )
+    fig = px.bar(
+        pd.DataFrame(demo_rows),
+        x="group",
+        y="churn_rate",
+        title="Churn rate by demographic group",
+        labels={"churn_rate": "Churn rate (%)", "group": ""},
+        text=[f"{r['churn_rate']:.1f}" for r in demo_rows],
     )
+    fig.update_traces(marker_color="#9467bd", textposition="outside")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.info(
+        "Headline EDA findings: month-to-month contracts (~43% churn vs ~3% on two-year), "
+        "electronic-check payment, fiber-optic internet without add-on protections, and the "
+        "first 6 months of tenure are the strongest churn signals — consistent with the "
+        "notebook analysis in `Customer_Churn_EDA.ipynb`."
+    )
+
+# ---------------------------------------------------------------- Risk segmentation
+with tab_risk:
+    st.subheader("Predicted-risk segmentation")
+    tiers = pd.cut(
+        risk_all,
+        bins=[-0.001, 0.3, 0.6, 1.0],
+        labels=["Low (<30%)", "Medium (30–60%)", "High (>60%)"],
+    )
+    seg = df_raw.assign(risk=risk_all, tier=tiers)
+
+    counts = seg["tier"].value_counts().reindex(["Low (<30%)", "Medium (30–60%)", "High (>60%)"])
+    high_rev = seg.loc[seg["tier"] == "High (>60%)", "MonthlyCharges"].sum()
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Low risk", f"{int(counts.iloc[0]):,}")
+    c2.metric("Medium risk", f"{int(counts.iloc[1]):,}")
+    c3.metric("High risk", f"{int(counts.iloc[2]):,}")
+    c4.metric("Monthly revenue in high tier", f"${high_rev:,.0f}")
+
+    left, right = st.columns([1, 1.4])
+    with left:
+        fig = px.bar(
+            counts.reset_index().set_axis(["tier", "customers"], axis=1),
+            x="tier",
+            y="customers",
+            title="Customers per risk tier",
+            color="tier",
+            color_discrete_sequence=["#2ca02c", "#ff7f0e", "#d62728"],
+        )
+        fig.update_layout(showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+    with right:
+        tier_profile = (
+            seg.groupby("tier", observed=True)
+            .agg(
+                avg_tenure=("tenure", "mean"),
+                avg_monthly=("MonthlyCharges", "mean"),
+                pct_month_to_month=("Contract", lambda s: (s == "Month-to-month").mean() * 100),
+            )
+            .round(1)
+            .reset_index()
+        )
+        st.markdown("**Tier profiles**")
+        st.dataframe(tier_profile, use_container_width=True, hide_index=True)
+        st.caption(
+            "High-risk customers skew to short tenure, high monthly charges and "
+            "month-to-month contracts — the levers the What-If Simulator tests."
+        )
+
+    st.markdown("#### Top 20 at-risk customers")
+    top = (
+        seg.sort_values("risk", ascending=False)
+        .head(20)[
+            [
+                "customerID",
+                "risk",
+                "tenure",
+                "Contract",
+                "PaymentMethod",
+                "InternetService",
+                "MonthlyCharges",
+                "Churn",
+            ]
+        ]
+        .assign(risk=lambda d: (d["risk"] * 100).round(1))
+        .rename(columns={"risk": "risk %"})
+    )
+    st.dataframe(top, use_container_width=True, hide_index=True)
 
 # ---------------------------------------------------------------- Gap 1
 with tab_gap1:
