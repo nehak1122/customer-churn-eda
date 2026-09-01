@@ -1,0 +1,101 @@
+{
+  "best_model": "Logistic Regression + SMOTE",
+  "feature_columns": [
+    "SeniorCitizen",
+    "Partner",
+    "Dependents",
+    "tenure",
+    "PhoneService",
+    "PaperlessBilling",
+    "MonthlyCharges",
+    "TotalCharges",
+    "gender_Female",
+    "gender_Male",
+    "MultipleLines_No",
+    "MultipleLines_No phone service",
+    "MultipleLines_Yes",
+    "InternetService_DSL",
+    "InternetService_Fiber optic",
+    "InternetService_No",
+    "OnlineSecurity_No",
+    "OnlineSecurity_No internet service",
+    "OnlineSecurity_Yes",
+    "OnlineBackup_No",
+    "OnlineBackup_No internet service",
+    "OnlineBackup_Yes",
+    "DeviceProtection_No",
+    "DeviceProtection_No internet service",
+    "DeviceProtection_Yes",
+    "TechSupport_No",
+    "TechSupport_No internet service",
+    "TechSupport_Yes",
+    "StreamingTV_No",
+    "StreamingTV_No internet service",
+    "StreamingTV_Yes",
+    "StreamingMovies_No",
+    "StreamingMovies_No internet service",
+    "StreamingMovies_Yes",
+    "Contract_Month-to-month",
+    "Contract_One year",
+    "Contract_Two year",
+    "PaymentMethod_Bank transfer (automatic)",
+    "PaymentMethod_Credit card (automatic)",
+    "PaymentMethod_Electronic check",
+    "PaymentMethod_Mailed check"
+  ],
+  "results": {
+    "Logistic Regression": {
+      "accuracy": 0.8041,
+      "precision": 0.6531,
+      "recall": 0.5588,
+      "f1": 0.6023,
+      "roc_auc": 0.842
+    },
+    "Random Forest": {
+      "accuracy": 0.7956,
+      "precision": 0.6369,
+      "recall": 0.5348,
+      "f1": 0.5814,
+      "roc_auc": 0.8316
+    },
+    "XGBoost": {
+      "accuracy": 0.7956,
+      "precision": 0.6378,
+      "recall": 0.5321,
+      "f1": 0.5802,
+      "roc_auc": 0.8315
+    },
+    "Logistic Regression + SMOTE": {
+      "accuracy": 0.7928,
+      "precision": 0.6085,
+      "recall": 0.615,
+      "f1": 0.6117,
+      "roc_auc": 0.8405
+    },
+    "Random Forest + SMOTE": {
+      "accuracy": 0.7708,
+      "precision": 0.5592,
+      "recall": 0.6444,
+      "f1": 0.5988,
+      "roc_auc": 0.8305
+    },
+    "XGBoost + SMOTE": {
+      "accuracy": 0.7828,
+      "precision": 0.596,
+      "recall": 0.5642,
+      "f1": 0.5797,
+      "roc_auc": 0.828
+    }
+  },
+  "train_balance_before_smote": {
+    "stayed": 4139,
+    "churned": 1495,
+    "churn_rate": 26.54
+  },
+  "train_balance_after_smote": {
+    "stayed": 4139,
+    "churned": 4139,
+    "churn_rate": 50.0
+  },
+  "test_size": 1409
+}

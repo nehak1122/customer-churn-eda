@@ -2,11 +2,38 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-orange.svg)](https://jupyter.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red.svg)](https://streamlit.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Exploratory Data Analysis on Telco Customer Churn dataset to identify key features driving customer churn behavior.
+Exploratory Data Analysis on Telco Customer Churn dataset to identify key features driving customer churn behavior — now extended with a **research gap-analysis implementation** (SMOTE, SHAP, what-if intervention simulation) and an interactive **Streamlit dashboard**.
 
 **TechnoHacks Internship Program | Data Science | Medium Level Task**
+
+---
+
+## 🆕 Gap-Analysis Extension (from 20 research papers, 2015–2026)
+
+We reviewed 20 verified customer churn papers (Vafeiadis et al. 2015 → El Attar & El-Hajj 2026)
+and found three gaps, each now implemented in this repo — see [GAP_ANALYSIS.md](GAP_ANALYSIS.md)
+for the paper-by-paper reasoning:
+
+| Gap in the literature | Implementation |
+|---|---|
+| 1. Class imbalance rarely handled carefully | [`ml/train_model.py`](ml/train_model.py) — LR / Random Forest / XGBoost trained **with & without SMOTE**, all evaluated on the same untouched test set |
+| 2. Prediction without explanation | [`ml/shap_explainer.py`](ml/shap_explainer.py) — SHAP global churn drivers + per-customer explanations |
+| 3. Nobody tests whether fixing the problem works | [`ml/intervention_simulator.py`](ml/intervention_simulator.py) — what-if simulator: contract upgrades, add-on services, auto-pay, discounts → predicted risk **before vs after the fix**, per customer and cohort-wide |
+
+### Run the pipeline & dashboard
+
+```bash
+pip install -r requirements.txt
+python -m ml.train_model          # trains 6 model variants, saves best model + metrics
+streamlit run dashboard/app.py    # interactive gap-analysis dashboard
+```
+
+Dashboard tabs: **Overview** (risk distribution) · **Gap 1** (SMOTE before/after metrics) ·
+**Gap 2** (SHAP global + single-customer) · **Gap 3** (what-if intervention simulator with
+cohort-level results).
 
 ---
 
@@ -91,6 +118,15 @@ customer-churn-eda/
 ├── Customer_Churn_EDA.html     # HTML export
 ├── WA_Fn-UseC_-Telco-Customer-Churn.csv  # Dataset
 ├── PRD_Churn_EDA_Medium.docx   # Requirements document
+├── GAP_ANALYSIS.md             # Research gaps from 20 papers → code mapping
+├── ml/                         # Gap-analysis ML package
+│   ├── data_preprocessing.py   # Load, clean, encode (reusable raw→features transform)
+│   ├── train_model.py          # 6 model variants (LR/RF/XGB × with/without SMOTE)
+│   ├── shap_explainer.py       # SHAP global + per-customer explanations
+│   ├── intervention_simulator.py  # What-if retention interventions (before/after risk)
+│   └── artifacts/              # Trained best model + metrics.json
+├── dashboard/
+│   └── app.py                  # Streamlit gap-analysis dashboard
 ├── requirements.txt            # Python dependencies
 ├── README.md                   # This file
 └── *.png                       # Generated visualizations
