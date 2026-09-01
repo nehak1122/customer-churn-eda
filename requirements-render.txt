@@ -1,0 +1,20 @@
+# Runtime-only dependencies for the Render deployment.
+#
+# Deliberately EXCLUDES xgboost, imbalanced-learn, matplotlib, seaborn and
+# jupyter: those are only used by ml/train_model.py and the EDA notebook.
+# The deployed dashboard loads the pre-trained artifacts in ml/artifacts/
+# and never retrains. Use the full requirements.txt locally to retrain.
+#
+# Versions are pinned to the ones the artifacts were pickled with — a
+# scikit-learn or numpy mismatch can break joblib.load() at startup.
+
+numpy==2.5.2
+pandas==3.0.5
+scipy==1.18.1
+scikit-learn==1.9.0
+joblib==1.6.0
+
+shap==0.52.0
+
+streamlit==1.62.0
+plotly==7.0.0

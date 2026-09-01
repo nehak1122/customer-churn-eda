@@ -35,6 +35,17 @@ Dashboard tabs: **Overview** (risk distribution) · **Gap 1** (SMOTE before/afte
 **Gap 2** (SHAP global + single-customer) · **Gap 3** (what-if intervention simulator with
 cohort-level results).
 
+### Deploy to Render
+
+The repo ships a [`render.yaml`](render.yaml) blueprint (single free-tier web service,
+pre-trained artifacts included — no training at build time):
+
+1. Go to [dashboard.render.com](https://dashboard.render.com) → **New +** → **Blueprint**
+2. Connect/select this repository (`nehak1122/customer-churn-eda`)
+3. Click **Apply** — Render builds from `requirements-render.txt` and serves the dashboard
+
+With `autoDeploy: true`, every push to `main` redeploys automatically.
+
 ---
 
 ## Key Findings

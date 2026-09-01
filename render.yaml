@@ -1,0 +1,37 @@
+# Render Blueprint — Customer Churn Gap-Analysis Dashboard
+#
+# One public web service running the Streamlit dashboard. The trained
+# model artifacts are committed in ml/artifacts/, so there is no
+# training step at build or boot time.
+#
+# Deploy: Render dashboard -> New + -> Blueprint -> select this repo -> Apply.
+
+services:
+  - type: web
+    name: churn-gap-dashboard
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+
+    buildCommand: pip install --upgrade pip && pip install -r requirements-render.txt
+    startCommand: >
+      streamlit run dashboard/app.py
+      --server.port $PORT
+      --server.address 0.0.0.0
+      --server.headless true
+      --server.enableCORS false
+      --server.enableXsrfProtection false
+
+    # Streamlit's built-in health endpoint.
+    healthCheckPath: /_stcore/health
+
+    autoDeploy: true
+
+    envVars:
+      # Match the Python the artifacts were pickled with (3.13).
+      - key: PYTHON_VERSION
+        value: "3.13.4"
+      # Keeps the build under the free-tier disk limit.
+      - key: PIP_NO_CACHE_DIR
+        value: "1"
