@@ -1,14 +1,15 @@
-# Render Blueprint — Customer Churn Gap-Analysis Dashboard
+# Render Blueprint — Customer Churn Analytics Dashboard
 #
-# One public web service running the Streamlit dashboard. The trained
-# model artifacts are committed in ml/artifacts/, so there is no
-# training step at build or boot time.
+# One public web service running the full Streamlit dashboard
+# (executive overview, EDA insights, risk segmentation, and the
+# gap-analysis tabs). The trained model artifacts are committed in
+# ml/artifacts/, so there is no training step at build or boot time.
 #
 # Deploy: Render dashboard -> New + -> Blueprint -> select this repo -> Apply.
 
 services:
   - type: web
-    name: churn-gap-dashboard
+    name: customer-churn-dashboard
     runtime: python
     plan: free
     region: oregon
